@@ -1,0 +1,24 @@
+name: Credential-free Reader approval gate test
+
+on:
+  workflow_dispatch:
+
+# No repository access is needed; never expose the automatic workflow token.
+permissions: {}
+
+jobs:
+  approval-gate:
+    name: Credential-free protected job
+    runs-on: ubuntu-24.04
+    timeout-minutes: 3
+    environment: reader-acceptance
+    # Deliberately no ref condition: the negative branch test must exercise
+    # GitHub's environment restriction, rather than pass through a skipped job.
+    steps:
+      - name: Record harmless execution evidence
+        shell: bash
+        run: |
+          set -euo pipefail
+          printf 'Workflow run ID: %s\n' "$GITHUB_RUN_ID"
+          printf 'Source SHA: %s\n' "$GITHUB_SHA"
+          printf 'Environment-gated job executed; verify owner approval in deployment history.\n'
