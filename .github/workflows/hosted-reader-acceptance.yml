@@ -1,0 +1,65 @@
+name: Hosted Reader acceptance
+
+on:
+  workflow_dispatch:
+    inputs:
+      reviewed_control_commit:
+        description: Full reviewed control main commit SHA (must match this run)
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: hosted-reader-acceptance
+  cancel-in-progress: false
+
+jobs:
+  reader:
+    # These checks supplement, never replace, the protected environment gate.
+    if: github.repository_id == '1460643831' && github.ref == 'refs/heads/main' && github.sha == inputs.reviewed_control_commit
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    environment: reader-acceptance
+    env:
+      REVIEWED_CONTROL_COMMIT: ${{ inputs.reviewed_control_commit }}
+    steps:
+      - name: Retrieve the exact control revision
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+          path: control
+      - name: Verify and install hash-locked Python dependencies without credentials
+        shell: bash
+        run: |
+          set -euo pipefail
+          umask 077
+          runtime="$RUNNER_TEMP/ogden-reader-env-$GITHUB_RUN_ID-$GITHUB_RUN_ATTEMPT"
+          test ! -e "$runtime"
+          python3.12 -m venv "$runtime"
+          if ! "$runtime/bin/python" -m pip install --disable-pip-version-check --no-cache-dir --require-hashes --only-binary=:all: --index-url https://pypi.org/simple -r control/requirements-reader.txt >/dev/null 2>&1; then
+            printf 'Dependency setup failed; no credential step executed.\n'
+            exit 1
+          fi
+      - name: Validate Reader and collect sanitized acceptance evidence
+        if: success()
+        shell: bash
+        env:
+          OGDEN_READER_PRIVATE_KEY: ${{ secrets.PROVISIONING_READER_APP_PRIVATE_KEY }}
+        run: |
+          set -euo pipefail
+          "$RUNNER_TEMP/ogden-reader-env-$GITHUB_RUN_ID-$GITHUB_RUN_ATTEMPT/bin/python" control/scripts/hosted_reader.py
+      - name: Remove owned temporary material on ordinary failure or success
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          if test -f control/scripts/hosted_reader.py; then
+            python3.12 control/scripts/hosted_reader.py cleanup
+          fi
+          runtime="$RUNNER_TEMP/ogden-reader-env-$GITHUB_RUN_ID-$GITHUB_RUN_ATTEMPT"
+          if test -d "$runtime" && ! test -L "$runtime"; then
+            rm -rf -- "$runtime"
+          fi
