@@ -31,7 +31,7 @@ jobs:
           ref: ${{ github.sha }}
           persist-credentials: false
           path: control
-      - name: Prepare pinned Python dependencies without credentials
+      - name: Verify and install hash-locked Python dependencies without credentials
         shell: bash
         run: |
           set -euo pipefail
@@ -39,11 +39,12 @@ jobs:
           runtime="$RUNNER_TEMP/ogden-reader-env-$GITHUB_RUN_ID-$GITHUB_RUN_ATTEMPT"
           test ! -e "$runtime"
           python3.12 -m venv "$runtime"
-          if ! "$runtime/bin/python" -m pip install --disable-pip-version-check -r control/requirements-reader.txt >/dev/null 2>&1; then
+          if ! "$runtime/bin/python" -m pip install --disable-pip-version-check --no-cache-dir --require-hashes --only-binary=:all: --index-url https://pypi.org/simple -r control/requirements-reader.txt >/dev/null 2>&1; then
             printf 'Dependency setup failed; no credential step executed.\n'
             exit 1
           fi
       - name: Validate Reader and collect sanitized acceptance evidence
+        if: success()
         shell: bash
         env:
           OGDEN_READER_PRIVATE_KEY: ${{ secrets.PROVISIONING_READER_APP_PRIVATE_KEY }}

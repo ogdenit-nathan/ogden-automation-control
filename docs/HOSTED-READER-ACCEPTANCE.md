@@ -40,8 +40,10 @@ The GitHub token requests Contents read only for the public checkout. It cannot
 replace App authentication and is not forwarded to the private CLI. The only
 external Action is full-SHA-pinned checkout; Python 3.12 on Ubuntu 24.04 and four
 exact package pins match the private implementation. The minor Python version is
-fixed; hosted OS/Python patch versions evolve. Package pins are not authenticated
-package hashes; trusted package delivery and dependency review remain prerequisites.
+fixed; hosted OS/Python patch versions evolve. All runtime packages and supported Linux x86_64 wheels have reviewed SHA-256 pins.
+Pip requires hashes, rejects source builds and does not use its download cache.
+See the dependency-integrity procedure below; trusted bootstrap Python/pip, reviewed
+upstream packages and control code remain prerequisites.
 
 Bootstrap validates App 5789924, installation 182698516, owner/name, selected-repo
 mode and exact read permissions. It requests a short-lived token scoped to private
@@ -180,10 +182,67 @@ Plan/Verify compliance or secure teardown on a real run. All live Batch 6F check
 remain pending owner authorization and execution. Windows-only tests from private
 PR #2 are not claims about this Linux job.
 
-Recorded local results: **24 tests passed, 0 failed, 0 skipped** on Python 3.12/Linux.
+Recorded local results: **29 tests passed, 0 failed, 0 skipped** on Python 3.12/Linux.
 Python compilation, YAML structure and every Bash step syntax check passed. The
 available private module files/profile were compared with the pinned Git blobs;
 the actual pinned Reader refusal guard also passed with a nonexistent synthetic
 key path, without network access. The private repository's complete historical
 147-test suite was not rerun for this public-controller-only change. No live App
 credential or GitHub-hosted acceptance run was used to obtain these results.
+
+## Dependency-integrity follow-up
+
+The exact package versions and CPython 3.12 requirement are unchanged. The lock
+supports the Ubuntu 24.04 hosted **Linux x86_64** job: PyJWT and pycparser universal
+wheels, cffi's CPython 3.12 manylinux x86_64 wheel, and cryptography's CPython 3.11
+abi3 x86_64 wheels for manylinux 2.17/2.28/2.34 (abi3 supports CPython 3.12). No
+source distribution, Windows, macOS, ARM, PyPy or free-threaded wheel is approved
+by this lock. An unsupported candidate fails closed instead of building source.
+
+`requirements-reader.txt` includes every direct/transitive runtime dependency and
+its permitted SHA-256 hashes. `docs/READER-DEPENDENCY-HASHES.json` records the six
+approved wheel filenames, PyPI artifact URLs, recomputed hashes and reviewed wheel
+metadata. Each wheel was downloaded over HTTPS from files.pythonhosted.org; its
+SHA-256 was independently computed from its bytes and matched the version-specific
+PyPI JSON metadata. Wheel Name/Version/Requires-Python/Requires-Dist were inspected.
+The applicable dependency closure is PyJWT, cryptography, cffi and pycparser; old
+Python/optional extras dependencies are not enabled for this Python 3.12 job.
+
+Installation uses `--require-hashes --only-binary=:all: --no-cache-dir` and the
+explicit HTTPS PyPI index. A missing hash, mismatched hash, unpinned new transitive
+dependency or unsupported distribution causes pip to fail. The shell exits 1 and
+the credential-bearing step explicitly requires `success()`. Do not add
+`continue-on-error`, disable hashes, permit source builds, or auto-regenerate the
+lock during a workflow run. Version/hash/runner changes require a reviewed PR.
+
+The dependency step has **no Reader-key environment mapping or secret reference**;
+the only key mapping remains on the later Reader step. Hash-locked installation is
+completed before that step starts. This is process/step scoping within the existing
+protected job, not a sandbox against a compromised runner, malicious workflow or
+future code that deliberately references another step's environment secret. Review
+all approved code and do not broaden secret mappings. Bootstrap Python and pip are
+provided by the trusted runner/venv, not installed or upgraded from unhashed inputs.
+
+New offline regressions use a generated synthetic wheel and real pip. They execute
+the workflow's dependency shell (only substituting the local offline wheel source
+and test Python path): a wrong hash prevents a synthetic next-phase marker; a
+correct hash permits that marker. A missing hash is independently rejected. No real
+credential is used or credential-bearing script invoked. Static checks verify key
+scoping, hash/binary flags, Python 3.12, step ordering and no continue-on-error.
+
+Recorded follow-up evidence: full **29-test suite passed**, 0 failures/skips; Python
+compilation, workflow parsing and every Bash syntax check passed. A clean isolated
+CPython 3.12 venv installed the four real packages from the downloaded approved
+wheels with hash enforcement; exact versions and `pip check` passed. Its process
+environment contained no Reader key. This does not establish live GitHub runner
+acceptance, and no secret was configured or workflow dispatched.
+
+Maintenance: retain the independently computed artifact hashes/provenance, inspect
+new metadata and advisory/release information, review dependency/ABI changes,
+download the exact new wheels without credentials, recompute/compare hashes, update
+the lock and provenance together, and rerun clean installation and negative tests.
+Never accept a hash printed by a failed production installation as automatic
+approval. PyPI metadata and downloads share an upstream trust boundary: pinned
+hashes prevent later substitution but are not independent publisher signatures or
+a guarantee that the originally reviewed package is benign. No new package manager
+or publishing/provisioning architecture is introduced.

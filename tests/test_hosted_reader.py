@@ -187,5 +187,5 @@ class HostedReader(unittest.TestCase):
   self.assertEqual(re.findall(r'secrets\.([A-Z_]+)',text),['PROVISIONING_READER_APP_PRIVATE_KEY'])
   self.assertTrue(all(re.fullmatch('[a-f0-9]{40}',pin) for pin in re.findall(r'uses: [^@]+@([^\s]+)',text)))
   self.assertNotIn('upload-artifact',text)
-  self.assertEqual([l.strip() for l in (ROOT/'requirements-reader.txt').read_text().splitlines() if l and not l.startswith('#')],['PyJWT==2.13.0','cryptography==50.0.0','cffi==2.1.1','pycparser==3.0'])
+  self.assertEqual(re.findall(r'^([A-Za-z]+==[0-9.]+)',(ROOT/'requirements-reader.txt').read_text(),re.MULTILINE),['PyJWT==2.13.0','cryptography==50.0.0','cffi==2.1.1','pycparser==3.0'])
 if __name__=='__main__':unittest.main()
